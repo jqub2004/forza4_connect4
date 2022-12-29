@@ -19,7 +19,7 @@ public class Server extends Thread implements Runnable {
 	public int port;
 	private char controllo;
 	private BufferServer buffer;
-	private BufferServer bufferLocal = new BufferServer();;
+	private BufferServer bufferLocal = new BufferServer();
 	private InputStream inputStream;
 	private OutputStream outputStream;
 	private ObjectInputStream objectInputStream;
@@ -27,12 +27,12 @@ public class Server extends Thread implements Runnable {
 	private Dati dato;
 	private String operatore;
 
-	//creo il primo server
-	public Server(BufferServer buffer, int num) {
+	// creo il server
+	public Server(BufferServer buffer, int num, ServerSocket server) {
 		try {
 			this.buffer = buffer;
 			executorService = Executors.newFixedThreadPool(2);
-			server = new ServerSocket(num,0);
+			this.server = server;
 			server.setReuseAddress(true);
 			server.getInetAddress();
 			System.out.println("Server" + num + " attivo " + InetAddress.getLocalHost());
@@ -43,16 +43,17 @@ public class Server extends Thread implements Runnable {
 			invioDati1();
 			this.start();
 		} catch (IOException e) {
-			server(buffer, num + 1);
+			server(buffer, num++, server);
 			e.printStackTrace();
 		}
 	}
-	//il secondo server
-	public void server(BufferServer buffer, int num) {
+
+	// se la creazione del server non va riprovo
+	public void server(BufferServer buffer, int num, ServerSocket server) {
 		try {
 			this.buffer = buffer;
 			executorService = Executors.newFixedThreadPool(2);
-			server = new ServerSocket(num);
+			this.server = server;
 			server.getInetAddress();
 			System.out.println("Server" + num + " attivo " + InetAddress.getLocalHost());
 			richiestaClient = server.accept();
@@ -62,18 +63,19 @@ public class Server extends Thread implements Runnable {
 			executorService.submit(this::contrBufferServerCondiviso);
 			executorService.submit(this::run);
 		} catch (IOException e) {
-			server(buffer, num + 1);
+			server(buffer, num + 1, server);
 			e.printStackTrace();
 		}
 	}
 
-	//controlla ciclicamente se ci sono nuovi dati se client abbia spedito
+	// controlla ciclicamente se ci sono nuovi dati se client abbia spedito
 	public void run() {
 		try {
 
 			inputStream = richiestaClient.getInputStream();
 			objectInputStream = new ObjectInputStream(inputStream);
 			while (true) {
+				System.out.println("apetto lettura");
 				dato = (Dati) objectInputStream.readObject();
 				Dati dato1 = new Dati(dato.getMossa(), "server", dato.getOp());
 				invioDatiGenerico(dato1);
@@ -87,7 +89,8 @@ public class Server extends Thread implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	//controllo il buffer condiviso con quello locale
+
+	// controllo il buffer condiviso con quello locale
 	public void contrBufferServerCondiviso() {
 		Dati dato1;
 		try {
@@ -109,7 +112,8 @@ public class Server extends Thread implements Runnable {
 		}
 
 	}
-	//invio i dati iniziali al client(Control.java)
+
+	// invio i dati iniziali al client(Control.java)
 	public synchronized void invioDati1() {
 		try {
 			objectOutputStream.writeObject(dato = new Dati("server", Dati.Operazione.NOM, controlloUsers()));
@@ -117,7 +121,8 @@ public class Server extends Thread implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	//invio i dati al client(Control.java)
+
+	// invio i dati al client(Control.java)
 	public synchronized void invioDatiGenerico(Dati dato) {
 		try {
 			objectOutputStream.writeObject(dato);
@@ -126,20 +131,24 @@ public class Server extends Thread implements Runnable {
 			e.printStackTrace();
 		}
 	}
-	//controllo se il turno è del giocatore 1 oppure 2 
+
+	// controllo se il turno è del giocatore 1 oppure 2
 	public String controlloUsers() {
 		if (!buffer.getGiocatore1()) {
 			operatore = "g";
-			return "g";
+			buffer.setGiocatore1(true);
+			return operatore;
 		} else if (!buffer.getGiocatore2()) {
 			operatore = "r";
-			return "r";
+			buffer.setGiocatore2(true);
+			return operatore;
 		}
 		operatore = "n";
 		return "n";
 
 	}
-	//aggiornamento del buffer che contiene le mosse dei giocatori
+
+	// aggiornamento del buffer che contiene le mosse dei giocatori
 	public void aggiornamentoBuffer(Dati dato) {
 		for (int j = 0; j < buffer.getmosse().length; j++) {
 			String controllo[] = buffer.getmosse()[j].split("-");
@@ -157,14 +166,17 @@ public class Server extends Thread implements Runnable {
 		System.out.println(buffer.toString());
 
 	}
-	//confronto tra le celle per verificare le condizioni di vittoria
+
+	// confronto tra le celle per verificare le condizioni di vittoria
 	public boolean confronto4Str(String a, String b, String c, String d) {
 		if (a.compareTo(b) == 0 && b.compareTo(c) == 0 && c.compareTo(d) == 0 && a.compareTo("n") != 0) {
 			return true;
 		}
 		return false;
 	}
-	//controllo delle varie situazioni che inducono alla vittora/sconfitta, oppure pareggio
+
+	// controllo delle varie situazioni che inducono alla vittora/sconfitta, oppure
+	// pareggio
 	public void controlloVincita(String[] mosse) {
 		Dati dato1;
 		for (int j = 0; j < 42; j++) {
@@ -179,17 +191,33 @@ public class Server extends Thread implements Runnable {
 				String controllo3[] = buffer.getmosse()[j + 3].split("-");
 				if (confronto4Str(controllo[1], controllo1[1], controllo2[1], controllo3[1])) {
 					if (controllo[1].compareTo(operatore) == 0) {
-						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.VIT));// in caso di vittoria di un
-																							// giocatore 1 o 2;
-					} else {
-						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PER));// in caso di sconfitta
-																							// dell'altro giocatore;
+						invioDatiGenerico(dati1 = new Dati("server", Dati.Operazione.VIT));
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}
+						
+					else {
+						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PER));
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
 					}
 
 				}
 
 			} else {
-				invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PAR)); // nel caso in cui nessuno dei due																// giocatori vince
+				invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PAR)); // nel caso in cui nessuno dei due	
+				// giocatori vince
+				try {
+					richiestaClient.close();
+				} catch (IOException e) {
+					System.out.println("socket chiuso");
+				}
 			}
 
 			// controllo vittoria in riga verticale
@@ -199,13 +227,29 @@ public class Server extends Thread implements Runnable {
 				String contrColomn2[] = buffer.getmosse()[j + 14].split("-");
 				String contrColomn3[] = buffer.getmosse()[j + 21].split("-");
 				if (confronto4Str(contrColomn[1], contrColomn1[1], contrColomn2[1], contrColomn3[1])) {
-					if (contrColomn[1].compareTo(operatore) == 0)
+					if (contrColomn[1].compareTo(operatore) == 0){
 						invioDatiGenerico(dati1 = new Dati("server", Dati.Operazione.VIT));
-					else
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}	else {
 						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PER));
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}
 				}
 			} else {
 				invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PAR));
+				try {
+					richiestaClient.close();
+				} catch (IOException e) {
+					System.out.println("socket chiuso");
+				}
 			}
 
 			// controllo della diagonale rivolto a destra
@@ -216,14 +260,29 @@ public class Server extends Thread implements Runnable {
 				String contrDia3[] = buffer.getmosse()[j + 24].split("-");
 				if (confronto4Str(contrDia[1], contrDia1[1], contrDia2[1], contrDia3[1])
 						&& contrDia[1].compareTo(operatore) == 0) {
-					if (contrDia[1].compareTo(operatore) == 0)
+					if (contrDia[1].compareTo(operatore) == 0) {
 						invioDatiGenerico(dati1 = new Dati("server", Dati.Operazione.VIT));
-					else
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					} else {
 						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PER));
-				}
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}
 			} else {
 				if (j >= 18) {
 					invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PAR));
+					try {
+						richiestaClient.close();
+					} catch (IOException e) {
+						System.out.println("socket chiuso");
+					}
 				}
 			}
 
@@ -235,18 +294,39 @@ public class Server extends Thread implements Runnable {
 				String contrSinistra3[] = buffer.getmosse()[j + 18].split("n");
 				if (confronto4Str(contrSinistra[1], contrSinistra1[1], contrSinistra2[1], contrSinistra3[1])
 						&& contrSinistra[1].compareTo(operatore) == 0) {
-					if (contrSinistra[1].compareTo(operatore) == 0)
+					if (contrSinistra[1].compareTo(operatore) == 0) {
 						invioDatiGenerico(dati1 = new Dati("server", Dati.Operazione.VIT));
-					else
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}
+						
+					else {
 						invioDatiGenerico(dato1 = new Dati("server", Dati.Operazione.PER));
+						try {
+							richiestaClient.close();
+						} catch (IOException e) {
+							System.out.println("socket chiuso");
+						}
+					}
+						
+					
 				}
 			} else {
 				if (j >= 21) {
 					invioDatiGenerico(dati1 = new Dati("server", Dati.Operazione.PAR));
+					try {
+						richiestaClient.close();
+					} catch (IOException e) {
+						System.out.println("socket chiuso");
+					}
 				}
 			}
 		}
 
 	}
 
+}
 }

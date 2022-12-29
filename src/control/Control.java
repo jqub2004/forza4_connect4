@@ -71,43 +71,59 @@ public class Control implements ActionListener {
 				interfaccia_user.setVisible(false);
 				interfaccia_user2.setVisible(true);
 				client(catchIP, porta);
-				interfaccia_user2.setMosse(mosse);
-
+				//interfaccia_user2.setMosse(mosse);
+				interfaccia_user2= new Interfaccia_user2(mosse);
+				listener();
 			}
 		}
-		System.out.println("azione\n");
+		System.out.println("azione ");
 		// interfaccia di gioco principale
 		if (e.getSource() == interfaccia_user2.getBtnNewButton()) {
-			calcMossa(0);
+			System.out.println("colonna 1");
+			calcMossa(1);
+
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_1()) {
-			calcMossa(1);
+			System.out.println("colonna 2");
+			calcMossa(2);
+			
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_2()) {
-			calcMossa(2);
+			System.out.println("colonna 3");
+			calcMossa(3);
+			
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_3()) {
-			calcMossa(3);
+			System.out.println("colonna 4");
+			calcMossa(4);
+			
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_4()) {
-			calcMossa(4);
+			System.out.println("colonna 5");
+			calcMossa(5);
+						
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_5()) {
-			calcMossa(5);
+			System.out.println("colonna 6");
+			calcMossa(6);
+			
 		}
 		if (e.getSource() == interfaccia_user2.getBtnNewButton_6()) {
-			calcMossa(6);
-		}
+			System.out.println("colonna 7");
+			calcMossa(7);
 
+		}
 		// schermata sconfitta/vittoria/pareggio
 		if (e.getSource() == schermoVittoria.getBtnNewButton()) {
 			schermoVittoria.setVisible(false);
 			interfaccia_user.setVisible(true);
 		}
+		System.out.println("fine servizio");
 	}
 
 	// preparo i dati da mandare al server
 	private void preparazioneDati(String mossa) {
+		System.out.println("controllo mossa" + mossa);
 		Dati dato1 = new Dati(mossa, operatore, Dati.Operazione.MOS);
 		invioDati(dato1);
 	}
@@ -117,7 +133,9 @@ public class Control implements ActionListener {
 		for (int i = 0; i < 42; i++) {
 			String controllo[] = mosse[i].split("-");
 			int integer = Integer.parseInt(controllo[0]);
+			System.out.println("integer == "+ integer +"  giocatore == " + controllo[1]);
 			if (integer % 10 == colonna && controllo[1].equals("n") == true) {
+				System.out.println("dati preparati dal client");
 				preparazioneDati(integer + "-" + operatore);
 				break;
 			}
@@ -162,9 +180,9 @@ public class Control implements ActionListener {
 			objectOutputStream = new ObjectOutputStream(outputStream);
 			System.out.println("funziona il socket!");
 			executorService.submit(this::run);
-			//executorService.submit(this::controlloConnessione);
+			// executorService.submit(this::controlloConnessione);
 		} catch (Exception e) {
-			client(indirizzo, port + 1);
+			//client(indirizzo, port + 1);
 			e.printStackTrace();
 		}
 	}
@@ -172,6 +190,7 @@ public class Control implements ActionListener {
 	// invio i dati al server
 	public void invioDati(Dati dato) {
 		try {
+			System.out.println("invio dato");
 			objectOutputStream.writeObject(dato);
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -189,28 +208,41 @@ public class Control implements ActionListener {
 				Dati datoInput = (Dati) objectInputStream.readObject();
 				contr_dati = datoInput;
 				System.out.println(datoInput.getMossa() + datoInput.getOperatore());
-				if (datoInput.getOp() == Dati.Operazione.GIO) {
+				switch (datoInput.getOp()) {
+				case GIO:
 					dati = datoInput;
-				} else if (datoInput.getOp() == Dati.Operazione.ERR) {
+					break;
+				case ERR:
 					System.out.println(datoInput.getMessErrore());
-				} else if (datoInput.getOp() == Dati.Operazione.PAR) {
+					break;
+				case PAR:
 					interfaccia_user2.setVisible(false);
 					schermoVittoria.setVisible(true);
 					schermoVittoria.getLblNewLabel().setText("pareggio");
-				} else if (datoInput.getOp() == Dati.Operazione.PER) {
+					socket.close();
+					break;
+				case PER:
 					interfaccia_user2.setVisible(false);
 					schermoVittoria.setVisible(true);
 					schermoVittoria.getLblNewLabel().setText("sconfitta");
-				} else if (datoInput.getOp() == Dati.Operazione.VIT) {
+					socket.close();
+					break;
+				case VIT:
 					interfaccia_user2.setVisible(false);
 					schermoVittoria.setVisible(true);
 					schermoVittoria.getLblNewLabel().setText("vittoria");
-				} else if (datoInput.getOp() == Dati.Operazione.NOM) {
+					socket.close();
+					break;
+				case NOM:
 					operatore = datoInput.getTesto();
 					System.out.println(operatore);
-				} else if (datoInput.getOp() == Dati.Operazione.MOS) {
+					break;
+				case MOS:
 					aggionaBuffer(datoInput);
 					interfaccia_user2.setMosse(mosse);
+					break;
+				default:
+					break;
 				}
 				Thread.sleep(250);
 			}
@@ -219,7 +251,8 @@ public class Control implements ActionListener {
 		}
 	}
 
-	// controllo la connessione se è stato effettuato in caso contrario si connetta a un'altra porta
+	// controllo la connessione se è stato effettuato in caso contrario si connetta
+	// a un'altra porta
 //	public void controlloConnessione() {
 //		try {
 //			System.out.println("errore connessione");
